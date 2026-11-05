@@ -1,0 +1,116 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(
+            name: 'DOCKERHUB_USER', 
+            defaultValue: 'yourdockerhubuser', 
+            description: 'Your Docker Hub username'
+        )
+    }
+
+    environment {
+        // Jenkins Credentials ID configured in Jenkins Dashboard
+        DOCKERHUB_CREDENTIALS_ID = 'dockerhub-credentials'
+        
+        // Build identification
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        
+        // Image names with Docker Hub namespace
+        BACKEND_IMAGE = "${params.DOCKERHUB_USER}/genz-backend"
+        FRONTEND_IMAGE = "${params.DOCKERHUB_USER}/genz-frontend"
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                echo "🚀 Checking out source code..."
+                checkout scm
+            }
+        }
+
+        stage('Run Tests') {
+            parallel {
+                stage('Test Backend') {
+                    steps {
+                        echo "🧪 Running Backend Unit Tests..."
+                        dir('backend') {
+                            sh 'npm install --prefer-offline'
+                            sh 'npm test'
+                        }
+                    }
+                }
+                stage('Test Frontend') {
+                    steps {
+                        echo "🎨 Validating Frontend Build..."
+                        dir('frontend') {
+                            sh 'npm install --prefer-offline'
+                            sh 'npm run test'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                echo "🐳 Building Docker Images tagged for Docker Hub..."
+                script {
+                    // Build and tag Backend
+                    dir('backend') {
+                        sh "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest ."
+                    }
+                    // Build and tag Frontend
+                    dir('frontend') {
+                        sh "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest ."
+                    }
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo "🔐 Authenticating and Pushing Images to Docker Hub..."
+                withCredentials([usernamePassword(
+                    credentialsId: env.DOCKERHUB_CREDENTIALS_ID,
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+                    
+                    // Push Backend tags
+                    echo "⬆️ Pushing Backend Image (${IMAGE_TAG} & latest)..."
+                    sh "docker push ${BACKEND_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${BACKEND_IMAGE}:latest"
+
+                    // Push Frontend tags
+                    echo "⬆️ Pushing Frontend Image (${IMAGE_TAG} & latest)..."
+                    sh "docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${FRONTEND_IMAGE}:latest"
+                }
+            }
+        }
+
+        stage('Deploy with Docker Compose') {
+            steps {
+                echo "🚢 Deploying updated containers..."
+                // Spins up the new version using the local docker-compose configuration
+                sh 'docker compose down'
+                sh 'docker compose up -d --build'
+            }
+        }
+    }
+
+    post {
+        always {
+            // Clean up Docker login credentials
+            sh 'docker logout || true'
+        }
+        success {
+            echo "🎉 CD Pipeline SUCCESSFUL! Images pushed to Docker Hub and containers deployed."
+        }
+        failure {
+            echo "❌ CD Pipeline FAILED! Review stage logs for details."
+        }
+    }
+}

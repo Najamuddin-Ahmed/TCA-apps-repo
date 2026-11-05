@@ -1,0 +1,12 @@
+{
+  "name": "genz-clothing-store",
+  "version": "1.0.0",
+  "description": "Full-stack Gen-Z Streetwear & Aesthetic Fits E-Commerce Web Application",
+  "scripts": {
+    "start": "node backend/src/server.js",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build"
+  },
+  "keywords": ["streetwear", "gen-z", "react", "vite", "tailwindcss", "express"]
+}

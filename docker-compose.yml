@@ -1,0 +1,19 @@
+# Simple Docker Compose for Gen-Z Clothing Store
+services:
+  # 1. Backend REST API (Node.js / Express)
+  backend:
+    build: ./backend
+    container_name: genz-backend
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+  # 2. Frontend Web App (Vite + React + Nginx)
+  frontend:
+    build: ./frontend
+    container_name: genz-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

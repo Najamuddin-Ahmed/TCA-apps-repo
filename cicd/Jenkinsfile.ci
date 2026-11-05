@@ -1,0 +1,73 @@
+pipeline {
+    agent any
+
+    environment {
+        // Tag images with build number for unique identification
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        BACKEND_IMAGE = "genz-backend:${IMAGE_TAG}"
+        FRONTEND_IMAGE = "genz-frontend:${IMAGE_TAG}"
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                echo "🚀 Checking out source code..."
+                checkout scm
+            }
+        }
+
+        stage('Test Backend') {
+            steps {
+                echo "🧪 Running Backend Unit Tests..."
+                dir('backend') {
+                    // Installs dependencies and runs Node.js built-in test runner
+                    sh 'npm install --prefer-offline'
+                    sh 'npm test'
+                }
+            }
+        }
+
+        stage('Test & Build Frontend') {
+            steps {
+                echo "🎨 Testing & Validating Frontend Build..."
+                dir('frontend') {
+                    // Verifies JSX, React, Tailwind CSS, and Vite bundle compilation
+                    sh 'npm install --prefer-offline'
+                    sh 'npm run test'
+                }
+            }
+        }
+
+        stage('Build Docker Images') {
+            steps {
+                echo "🐳 Building Docker Images for Backend and Frontend..."
+                script {
+                    // Build Backend Image
+                    dir('backend') {
+                        sh "docker build -t ${BACKEND_IMAGE} -t genz-backend:latest ."
+                    }
+                    // Build Frontend Image
+                    dir('frontend') {
+                        sh "docker build -t ${FRONTEND_IMAGE} -t genz-frontend:latest ."
+                    }
+                }
+            }
+        }
+
+        stage('Verify Docker Images') {
+            steps {
+                echo "✅ Verifying Built Images..."
+                sh "docker images | grep genz-"
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "🎉 CI Pipeline PASSED! All tests passed and Docker images built successfully."
+        }
+        failure {
+            echo "❌ CI Pipeline FAILED! Check the stage logs above for details."
+        }
+    }
+}

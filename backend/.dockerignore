@@ -1,0 +1,5 @@
+# Ignore node_modules so the container installs its own fresh packages
+node_modules
+npm-debug.log
+.git
+.env
